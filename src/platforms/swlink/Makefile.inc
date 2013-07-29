@@ -2,36 +2,37 @@ CROSS_COMPILE ?= arm-none-eabi-
 CC = $(CROSS_COMPILE)gcc
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
-CFLAGS += -mcpu=cortex-m3 -mthumb \
-	-DSTM32F1 -DDISCOVERY_SWLINK -I../libopencm3/include \
+ARCH_FLAGS = -mcpu=cortex-m3 -mthumb
+
+CFLAGS += -DSTM32F1 -DDISCOVERY_SWLINK -I../libopencm3/include \
 	-I platforms/stm32
+
 LDFLAGS_BOOT := $(LDFLAGS) --specs=nano.specs \
 	-lopencm3_stm32f1 -Wl,--defsym,_stack=0x20005000 \
 	-Wl,-T,platforms/stm32/stlink.ld -nostartfiles -lc -lnosys \
-	-Wl,-Map=mapfile -mthumb -mcpu=cortex-m3 -Wl,-gc-sections \
+	-Wl,-gc-sections \
 	-L../libopencm3/lib
+
 LDFLAGS = $(LDFLAGS_BOOT) -Wl,-Ttext=0x8002000
+
+CFLAGS += $(ARCH_FLAGS)
+LDFLAGS += $(ARCH_FLAGS) -Wl,-Map=blackmagic.map
+LDFLAGS_BOOT += $(ARCH_FLAGS) -Wl,-Map=blackmagic_dfu.map
 
 VPATH += platforms/stm32
 
 SRC += 	cdcacm.c	\
 	platform.c	\
-	usbuart.c \
+	usbuart.c	\
 
-all:	blackmagic.bin blackmagic_dfu.bin blackmagic_dfu.hex
+DFUSRC += usbdfu.c	\
+	dfucore.c	\
+	dfu_f1.c	\
 
-blackmagic.bin:	blackmagic
-	$(OBJCOPY) -O binary $^ $@
+all:	blackmagic.bin blackmagic.hex blackmagic_dfu.bin blackmagic_dfu.hex
 
-blackmagic_dfu: usbdfu.o dfucore.o dfu_f1.o
-	$(CC) $^ -o $@ $(LDFLAGS_BOOT)
-
-blackmagic_dfu.bin:	blackmagic_dfu
-	$(OBJCOPY) -O binary $^ $@
-
-blackmagic_dfu.hex:	blackmagic_dfu
-	$(OBJCOPY) -O ihex $^ $@
+blackmagic: blackmagic.elf
 
 host_clean:
-	-rm blackmagic.bin blackmagic_dfu blackmagic_dfu.bin blackmagic_dfu.hex
-
+	-rm -f blackmagic.elf blackmagic.bin blackmagic.hex blackmagic.map
+	-rm -f blackmagic_dfu.elf blackmagic_dfu.bin blackmagic_dfu.hex blackmagic_dfu.map

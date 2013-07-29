@@ -40,15 +40,25 @@ SRC =			\
 include $(PLATFORM_DIR)/Makefile.inc
 
 OBJ = $(SRC:.c=.o)
+DFUOBJ = $(DFUSRC:.c=.o)
 
-blackmagic: $(OBJ)
+blackmagic.elf: $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
+
+blackmagic_dfu.elf: $(DFUOBJ)
+	$(CC) $^ -o $@ $(LDFLAGS_BOOT)
+
+%.bin:	%.elf
+	$(OBJCOPY) -O binary $^ $@
+
+%.hex:	%.elf
+	$(OBJCOPY) -O ihex $^ $@
 
 .PHONY:	clean host_clean
 
 clean:	host_clean
-	-$(RM) *.o *.d *~ blackmagic $(HOSTFILES)
-	-$(RM) platforms/*/*.o platforms/*/*.d mapfile
+	-$(RM) *.o *.d *~ $(HOSTFILES)
+	-$(RM) platforms/*/*.o platforms/*/*.d
 
 -include *.d
 

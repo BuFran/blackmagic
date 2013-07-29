@@ -29,7 +29,7 @@
 #include <libopencm3/stm32/exti.h>
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/usb/usbd.h>
-#include <libopencm3/stm32/adc.h>
+#include <libopencm3/stm32/f1/adc.h>
 
 #include "platform.h"
 #include "jtag_scan.h"

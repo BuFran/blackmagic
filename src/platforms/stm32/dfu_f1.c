@@ -18,7 +18,7 @@
  */
 
 
-#include <libopencm3/stm32/f1/flash.h>
+#include <libopencm3/stm32/flash.h>
 #include <libopencm3/cm3/scb.h>
 #include "usbdfu.h"
 

@@ -22,7 +22,7 @@
  * implementation.
  */
 
-#include <libopencm3/stm32/f1/rcc.h>
+#include <libopencm3/stm32/rcc.h>
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/nvic.h>

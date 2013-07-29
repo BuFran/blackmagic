@@ -17,13 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#if defined(STM32F2)
-#	include <libopencm3/stm32/f2/flash.h>
-#elif defined(STM32F4)
-#	include <libopencm3/stm32/f4/flash.h>
-#endif
 #include <libopencm3/cm3/scb.h>
-
+#include <libopencm3/stm32/flash.h>
 #include "usbdfu.h"
 
 static uint32_t sector_addr[] = {0x8000000, 0x8004000, 0x8008000, 0x800c000,

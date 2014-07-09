@@ -26,13 +26,15 @@
 
 #include <stdint.h>
 #include <libopencm3/cm3/common.h>
-#include <libopencm3/stm32/f1/memorymap.h>
+#include <libopencm3/stm32/memorymap.h>
 
-#include <libopencm3/stm32/f1/gpio.h>
+#include <libopencm3/stm32/gpio.h>
 #include <libopencm3/usb/usbd.h>
 
 #include <setjmp.h>
 #include <alloca.h>
+
+#include "io.h"
 
 #include "gdb_packet.h"
 
@@ -71,45 +73,25 @@ extern usbd_device *usbdev;
  */
 
 /* Hardware definitions... */
-#define TDI_PORT	GPIOA
-#define TMS_PORT	GPIOB
-#define TCK_PORT	GPIOA
-#define TDO_PORT	GPIOA
-#define TDI_PIN		GPIO7
-#define TMS_PIN		GPIO14
-#define TCK_PIN		GPIO5
-#define TDO_PIN		GPIO6
+#define PIN_TDI			PA7
+#define PIN_TDO			PA6
+#define PIN_TCK			PA5
+#define PIN_TMS			PB14
 
-#define SWDIO_PORT 	TMS_PORT
-#define SWCLK_PORT 	TCK_PORT
-#define SWDIO_PIN	TMS_PIN
-#define SWCLK_PIN	TCK_PIN
+#define PIN_SWDIO		PIN_TMS
+#define PIN_SWCLK		PIN_TCK
 
-#define SRST_PORT	GPIOB
-#define SRST_PIN_V1	GPIO1
-#define SRST_PIN_V2	GPIO0
+#define PIN_SRST_V1		PB1
+#define PIN_SRST_V2		PB0
+#define PIN_SRST		pin_srst
 
-#define LED_PORT	GPIOA
 /* Use PC14 for a "dummy" uart led. So we can observere at least with scope*/
-#define LED_PORT_UART	GPIOC
-#define LED_UART	GPIO14
+#define PIN_LED_UART		PC14
 
-#define TMS_SET_MODE()                                          \
-    gpio_set_mode(TMS_PORT, GPIO_MODE_OUTPUT_50_MHZ,            \
-                  GPIO_CNF_OUTPUT_PUSHPULL, TMS_PIN);
-#define SWDIO_MODE_FLOAT()                              \
-    gpio_set_mode(SWDIO_PORT, GPIO_MODE_INPUT,          \
-                  GPIO_CNF_INPUT_FLOAT, SWDIO_PIN);
-#define SWDIO_MODE_DRIVE()                                              \
-    gpio_set_mode(SWDIO_PORT, GPIO_MODE_OUTPUT_50_MHZ,                  \
-                  GPIO_CNF_OUTPUT_PUSHPULL, SWDIO_PIN);
+#define PIN_LED_IDLERUN_V1	PA8
+#define PIN_LED_IDLERUN_V2	PA9
+#define PIN_LED_IDLERUN		led_idlerun
 
-#define UART_PIN_SETUP()                                                \
-    gpio_set_mode(USBUSART_PORT, GPIO_MODE_OUTPUT_2_MHZ,                \
-                  GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, USBUSART_TX_PIN);
-
-#define SRST_SET_VAL(x)				\
-    platform_srst_set_val(x)
 
 #define USB_DRIVER      stm32f103_usb_driver
 #define USB_IRQ         NVIC_USB_LP_CAN_RX0_IRQ
@@ -124,17 +106,18 @@ extern usbd_device *usbdev;
 #define IRQ_PRI_USB_VBUS	(14 << 4)
 #define IRQ_PRI_TIM3		(0 << 4)
 
-#define USBUSART USART2
-#define USBUSART_CR1 USART2_CR1
-#define USBUSART_IRQ NVIC_USART2_IRQ
-#define USBUSART_CLK RCC_USART2
-#define USBUSART_PORT GPIOA
-#define USBUSART_TX_PIN GPIO2
-#define USBUSART_ISR usart2_isr
-#define USBUSART_TIM TIM4
-#define USBUSART_TIM_CLK_EN() rcc_periph_clock_enable(RCC_TIM4)
-#define USBUSART_TIM_IRQ NVIC_TIM4_IRQ
-#define USBUSART_TIM_ISR tim4_isr
+#define USBUSART		USART2
+#define USBUSART_PIN_TX		PA2
+#define USBUSART_CR1		USART2_CR1
+#define USBUSART_IRQ		NVIC_USART2_IRQ
+#define USBUSART_CLK		RCC_USART2
+#define USBUSART_ISR		usart2_isr
+
+#define USBUSART_TIM		TIM4
+#define USBUSART_TIM_CLK	RCC_TIM4
+#define USBUSART_TIM_IRQ	NVIC_TIM4_IRQ
+#define USBUSART_TIM_ISR	tim4_isr
+
 
 #define DEBUG(...)
 
@@ -144,17 +127,11 @@ extern volatile uint32_t timeout_counter;
 extern jmp_buf fatal_error_jmpbuf;
 
 extern const char *morse_msg;
+extern uint32_t led_idlerun;
+extern uint32_t pin_srst;
 
-#define gpio_set_val(port, pin, val) do {	\
-	if(val)					\
-		gpio_set((port), (pin));	\
-	else					\
-		gpio_clear((port), (pin));	\
-} while(0)
-
-extern uint16_t led_idle_run;
 #define SET_RUN_STATE(state)	{running_status = (state);}
-#define SET_IDLE_STATE(state)	{gpio_set_val(LED_PORT, led_idle_run, state);}
+#define SET_IDLE_STATE(state)	io_set(led_idlerun, state)
 
 #define PLATFORM_SET_FATAL_ERROR_RECOVERY()	{setjmp(fatal_error_jmpbuf);}
 #define PLATFORM_FATAL_ERROR(error)	do { 		\
@@ -185,27 +162,7 @@ void uart_usb_buf_drain(uint8_t ep);
 #define sprintf siprintf
 #define vasprintf vasiprintf
 
-#ifdef INLINE_GPIO
-static inline void _gpio_set(uint32_t gpioport, uint16_t gpios)
-{
-	GPIO_BSRR(gpioport) = gpios;
-}
-#define gpio_set _gpio_set
-
-static inline void _gpio_clear(uint32_t gpioport, uint16_t gpios)
-{
-	GPIO_BRR(gpioport) = gpios;
-}
-#define gpio_clear _gpio_clear
-
-static inline uint16_t _gpio_get(uint32_t gpioport, uint16_t gpios)
-{
-	return (uint16_t)GPIO_IDR(gpioport) & gpios;
-}
-#define gpio_get _gpio_get
-#endif
-
-#endif
-
 void disconnect_usb(void);
 void assert_boot_pin(void);
+
+#endif

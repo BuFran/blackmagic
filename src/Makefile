@@ -2,13 +2,14 @@ PROBE_HOST ?= native
 PLATFORM_DIR = platforms/$(PROBE_HOST)
 VPATH += $(PLATFORM_DIR)
 
-BUILDDATE := `date +"%Y%m%d"`
+BUILDDATE := $(shell date +"%Y%m%d")
+VERSUFFIX := $(shell ../scripts/setlocalversion)
 
 CFLAGS += -Wall -Wextra -Wno-pointer-sign -Wno-char-subscripts\
 	-Wno-sign-compare \
 	-O2 -std=gnu99 -g3 -DBUILDDATE=\"$(BUILDDATE)\"\
 	-I. -Iinclude -I$(PLATFORM_DIR) \
-	-DVERSION_SUFFIX=\"`../scripts/setlocalversion`\" -MD
+	-DVERSION_SUFFIX=\"$(VERSUFFIX)\" -MD 
 
 SRC =			\
 	adiv5.c		\

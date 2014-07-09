@@ -41,7 +41,6 @@ volatile uint32_t timeout_counter;
 
 jmp_buf fatal_error_jmpbuf;
 
-uint16_t led_idle_run;
 /* Pins PC[14:13] are used to detect hardware revision. Read
  * 11 for STLink V1 e.g. on VL Discovery, tag as hwversion 0
  * 10 for STLink V2 e.g. on F4 Discovery, tag as hwversion 1
@@ -49,29 +48,27 @@ uint16_t led_idle_run;
 int platform_hwversion(void)
 {
 	static int hwversion = -1;
-        int i;
+	int i;
 	if (hwversion == -1) {
-		gpio_set_mode(GPIOC, GPIO_MODE_INPUT,
-				GPIO_CNF_INPUT_PULL_UPDOWN,
-				GPIO14 | GPIO13);
-		gpio_set(GPIOC, GPIO14 | GPIO13);
-                for (i = 0; i<10; i++)
-                    hwversion = ~(gpio_get(GPIOC, GPIO14 | GPIO13) >> 13) & 3;
-                switch (hwversion)
-                {
-                case 0:
-                    led_idle_run = GPIO8;
-                    break;
-                default:
-                    led_idle_run = GPIO9;
-                }
+		io_input_pullup(PC13);
+		io_input_pullup(PC14);
+		
+		for (i = 0; i<10; i++)
+			hwversion = ~(gpio_get(GPIOC, GPIO14 | GPIO13) >> 13) & 3;
 	}
 	return hwversion;
 }
 
+uint32_t led_idlerun;
+uint32_t pin_srst;
+
 int platform_init(void)
 {
+#if defined(FCLK_16MHZ)
+	rcc_clock_setup_in_hse_16mhz_out_72mhz();
+#else
 	rcc_clock_setup_in_hse_8mhz_out_72mhz();
+#endif
 
 	/* Enable peripherals */
 	rcc_periph_clock_enable(RCC_USB);
@@ -81,31 +78,26 @@ int platform_init(void)
 	rcc_periph_clock_enable(RCC_AFIO);
 	rcc_periph_clock_enable(RCC_CRC);
 
-	/* On Rev 1 unconditionally activate MCO on PORTA8 with HSE
-         * platform_hwversion() also needed to initialize led_idle_run!
-         */
-        if (platform_hwversion() == 1)
-        {
-            RCC_CFGR &= ~(                 0xf<< 24);
-            RCC_CFGR |=  (RCC_CFGR_MCO_HSECLK << 24);
-            gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_50_MHZ,
-                          GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO8);
-        }
+	/* On Rev 1 unconditionally activate MCO on PORTA8 with HSE */
+	if (platform_hwversion() == 1)
+	{
+		RCC_CFGR &= ~(                 0xf<< 24);
+		RCC_CFGR |=  (RCC_CFGR_MCO_HSECLK << 24);
+		io_af_out(PA8);
+	}
+	
+	pin_srst = platform_hwversion() == 0 ? PIN_SRST_V1 : PIN_SRST_V2;
+	led_idlerun = platform_hwversion() == 0 ? PIN_LED_IDLERUN_V1 : PIN_LED_IDLERUN_V2;
+	
 	/* Setup GPIO ports */
-	gpio_set_mode(TMS_PORT, GPIO_MODE_OUTPUT_50_MHZ,
-			GPIO_CNF_OUTPUT_PUSHPULL, TMS_PIN);
-	gpio_set_mode(TCK_PORT, GPIO_MODE_OUTPUT_50_MHZ,
-			GPIO_CNF_OUTPUT_PUSHPULL, TCK_PIN);
-	gpio_set_mode(TDI_PORT, GPIO_MODE_OUTPUT_50_MHZ,
-			GPIO_CNF_OUTPUT_PUSHPULL, TDI_PIN);
-	uint16_t srst_pin = platform_hwversion() == 0 ?
-		SRST_PIN_V1 : SRST_PIN_V2;
-	gpio_set(SRST_PORT, srst_pin);
-	gpio_set_mode(SRST_PORT, GPIO_MODE_OUTPUT_50_MHZ,
-			GPIO_CNF_OUTPUT_OPENDRAIN, srst_pin);
+	io_output(PIN_TMS);
+	io_output(PIN_TCK);
+	io_output(PIN_TDI);
 
-	gpio_set_mode(LED_PORT, GPIO_MODE_OUTPUT_2_MHZ,
-			GPIO_CNF_OUTPUT_PUSHPULL, led_idle_run);
+	io_high(PIN_SRST);
+	io_output_opendrain(PIN_SRST);
+	
+	io_output(PIN_LED_IDLERUN);
 
 	/* Setup heartbeat timer */
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB_DIV8);
@@ -132,20 +124,10 @@ void platform_delay(uint32_t delay)
 	while(timeout_counter);
 }
 
-void platform_srst_set_val(bool assert)
-{
-	uint16_t pin;
-	pin = platform_hwversion() == 0 ? SRST_PIN_V1 : SRST_PIN_V2;
-	if (assert)
-		gpio_clear(SRST_PORT, pin);
-	else
-		gpio_set(SRST_PORT, pin);
-}
-
 void sys_tick_handler(void)
 {
 	if(running_status)
-		gpio_toggle(LED_PORT, led_idle_run);
+		io_toggle(led_idlerun);
 
 	if(timeout_counter)
 		timeout_counter--;
@@ -170,9 +152,8 @@ void disconnect_usb(void)
 	rcc_periph_reset_pulse(RST_USB);
 	rcc_periph_clock_enable(RCC_USB);
 	rcc_periph_clock_enable(RCC_GPIOA);
-	gpio_clear(GPIOA, GPIO12);
-	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_2_MHZ,
-		GPIO_CNF_OUTPUT_OPENDRAIN, GPIO12);
+	
+	io_output_low(PA12);
 }
 
 void assert_boot_pin(void)

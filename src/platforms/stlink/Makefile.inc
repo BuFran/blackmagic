@@ -4,7 +4,7 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 
 CFLAGS += -mcpu=cortex-m3 -mthumb \
 	-DSTM32F1 -DDISCOVERY_STLINK -I../libopencm3/include \
-	-I platforms/stm32
+	-I platforms/stm32	
 LDFLAGS_BOOT := $(LDFLAGS) --specs=nano.specs \
 	-lopencm3_stm32f1 -Wl,--defsym,_stack=0x20005000 \
 	-Wl,-T,platforms/stm32/stlink.ld -nostartfiles -lc -lnosys \

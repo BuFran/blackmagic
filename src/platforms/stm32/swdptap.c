@@ -35,37 +35,38 @@ static void swdptap_turnaround(uint8_t dir)
 	DEBUG("%s", dir ? "\n-> ":"\n<- ");
 
 	/* Don't turnaround if direction not changing */
-	if(dir == olddir) return;
+	if(dir == olddir)
+		return;
 	olddir = dir;
 
 	if(dir)
-		SWDIO_MODE_FLOAT();
-	gpio_set(SWCLK_PORT, SWCLK_PIN);
-	gpio_clear(SWCLK_PORT, SWCLK_PIN);
+		io_input(PIN_SWDIO);
+	io_high(PIN_SWCLK);
+	io_low(PIN_SWCLK);
 	if(!dir)
-		SWDIO_MODE_DRIVE();
+		io_output(PIN_SWDIO);
 }
 
 static uint8_t swdptap_bit_in(void)
 {
-	uint16_t ret;
+	bool ret;
 
-	ret = gpio_get(SWDIO_PORT, SWDIO_PIN);
-	gpio_set(SWCLK_PORT, SWCLK_PIN);
-	gpio_clear(SWCLK_PORT, SWCLK_PIN);
+	ret = io_is_set(PIN_SWDIO);
+	io_high(PIN_SWCLK);
+	io_low(PIN_SWCLK);
 
 	DEBUG("%d", ret?1:0);
 
-	return ret != 0;
+	return ret;
 }
 
 static void swdptap_bit_out(uint8_t val)
 {
 	DEBUG("%d", val);
 
-	gpio_set_val(SWDIO_PORT, SWDIO_PIN, val);
-	gpio_set(SWCLK_PORT, SWCLK_PIN);
-	gpio_clear(SWCLK_PORT, SWCLK_PIN);
+	io_set(PIN_SWDIO, val);
+	io_high(PIN_SWCLK);
+	io_low(PIN_SWCLK);
 }
 
 int swdptap_init(void)
@@ -85,7 +86,8 @@ void swdptap_reset(void)
 {
 	swdptap_turnaround(0);
 	/* 50 clocks with TMS high */
-	for(int i = 0; i < 50; i++) swdptap_bit_out(1);
+	for(int i = 0; i < 50; i++)
+		swdptap_bit_out(1);
 }
 
 
@@ -97,7 +99,8 @@ uint32_t swdptap_seq_in(int ticks)
 	swdptap_turnaround(1);
 
 	while(ticks--) {
-		if(swdptap_bit_in()) ret |= index;
+		if(swdptap_bit_in())
+			ret |= index;
 		index <<= 1;
 	}
 
@@ -120,7 +123,8 @@ uint8_t swdptap_seq_in_parity(uint32_t *ret, int ticks)
 		}
 		index <<= 1;
 	}
-	if(swdptap_bit_in()) parity ^= 1;
+	if(swdptap_bit_in())
+		parity ^= 1;
 
 	return parity;
 }

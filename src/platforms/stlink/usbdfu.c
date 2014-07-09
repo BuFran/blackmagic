@@ -22,11 +22,11 @@
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/cm3/scb.h>
+#include "io.h"
 
 #include "usbdfu.h"
 
 static uint8_t rev;
-static uint16_t led_idle_run;
 static uint32_t led2_state = 0;
 
 uint32_t app_address = 0x08002000;
@@ -34,8 +34,6 @@ uint32_t app_address = 0x08002000;
 static int stlink_test_nrst(void)
 {
 	/* Test if JRST/NRST is pulled down*/
-	uint16_t nrst;
-	uint16_t pin;
 	uint32_t systick_value;
 
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB_DIV8);
@@ -48,32 +46,31 @@ static int stlink_test_nrst(void)
 	 *  10 for ST-Link V2, e.g. on F4 Discovery, tag as rev 1
 	 */
 	rcc_periph_clock_enable(RCC_GPIOC);
-	gpio_set_mode(GPIOC, GPIO_MODE_INPUT,
-				  GPIO_CNF_INPUT_PULL_UPDOWN, GPIO14 | GPIO13);
-	gpio_set(GPIOC, GPIO14 | GPIO13);
+	rcc_periph_clock_enable(RCC_GPIOB);
+	
+	io_input_pullup(PC13);
+	io_input_pullup(PC14);
+	
 	systick_value = systick_get_value();
 	while (systick_get_value() > (systick_value - 1000)); /* Wait 1 msec*/
+
 	rev = (~(gpio_get(GPIOC, GPIO14 | GPIO13)) >> 13) & 3;
+
 	switch (rev) {
 	case 0:
-		pin = GPIO1;
-		led_idle_run = GPIO8;
+		io_output(PA8);
+		io_input_pulldown(PB1);
 		break;
 	default:
-		pin = GPIO0;
-		led_idle_run = GPIO9;
+		io_output(PA9);
+		io_input_pulldown(PB0);
 	}
-	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_2_MHZ,
-			GPIO_CNF_OUTPUT_PUSHPULL, led_idle_run);
-	rcc_periph_clock_enable(RCC_GPIOB);
-	gpio_set_mode(GPIOB, GPIO_MODE_INPUT,
-			GPIO_CNF_INPUT_PULL_UPDOWN, pin);
-	gpio_set(GPIOB, pin);
+
 	systick_value = systick_get_value();
 	while (systick_get_value() > (systick_value - 20000)); /* Wait 20 msec*/
-	nrst = gpio_get(GPIOB, pin);
 	systick_counter_disable();
-	return (nrst) ? 1 : 0;
+	
+	return io_is_set((rev == 0) ? PB1 : PB0) ? 1 : 0;
 }
 
 void dfu_detach(void)
@@ -83,9 +80,10 @@ void dfu_detach(void)
 	rcc_periph_reset_pulse(RST_USB);
 	rcc_periph_clock_enable(RCC_USB);
 	rcc_periph_clock_enable(RCC_GPIOA);
-	gpio_clear(GPIOA, GPIO12);
-	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_2_MHZ,
-		GPIO_CNF_OUTPUT_OPENDRAIN, GPIO12);
+
+	io_low(PA12);
+	io_output_opendrain(PA12);
+
 	scb_reset_system();
 }
 
@@ -93,6 +91,7 @@ int main(void)
 {
 	/* Check the force bootloader pin*/
 	rcc_periph_clock_enable(RCC_GPIOA);
+	
 	/* Check value of GPIOA1 configuration. This pin is unconnected on
 	 * STLink V1 and V2. If we have a value other than the reset value (0x4),
 	 * we have a warm start and request Bootloader entry
@@ -102,7 +101,11 @@ int main(void)
 
 	dfu_protect(DFU_MODE);
 
+#if defined(FCLK_16MHZ)
+	rcc_clock_setup_in_hse_16mhz_out_72mhz();
+#else
 	rcc_clock_setup_in_hse_8mhz_out_72mhz();
+#endif
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB_DIV8);
 	systick_set_reload(900000);
 
@@ -113,9 +116,9 @@ int main(void)
 	rcc_periph_reset_pulse(RST_USB);
 	rcc_periph_clock_enable(RCC_USB);
 	rcc_periph_clock_enable(RCC_GPIOA);
-	gpio_clear(GPIOA, GPIO12);
-	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_2_MHZ,
-		GPIO_CNF_OUTPUT_OPENDRAIN, GPIO12);
+	
+	io_low(PA12);
+	io_output_opendrain(PA12);
 
 	systick_interrupt_enable();
 	systick_counter_enable();
@@ -128,14 +131,12 @@ int main(void)
 void sys_tick_handler(void)
 {
 	if (rev == 0) {
-		gpio_toggle(GPIOA, led_idle_run);
+		io_toggle(PA8);
 	} else {
 		if (led2_state & 1) {
-			gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_2_MHZ,
-				GPIO_CNF_OUTPUT_PUSHPULL, led_idle_run);
+			io_output(PA9);
 		} else {
-			gpio_set_mode(GPIOA, GPIO_MODE_INPUT,
-				GPIO_CNF_INPUT_ANALOG, led_idle_run);
+			io_input_analog(PA9);
 		}
 		led2_state++;
 	}

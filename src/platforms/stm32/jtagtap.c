@@ -29,10 +29,11 @@
 
 int jtagtap_init(void)
 {
-	TMS_SET_MODE();
+	io_output(PIN_TMS);
 
 	/* Go to JTAG mode for SWJ-DP */
-	for(int i = 0; i <= 50; i++) jtagtap_next(1, 0); /* Reset SW-DP */
+	for (int i = 0; i <= 50; i++)
+		jtagtap_next(1, 0); /* Reset SW-DP */
 	jtagtap_tms_seq(0xE73C, 16);		/* SWD to JTAG sequence */
 	jtagtap_soft_reset();
 
@@ -41,11 +42,12 @@ int jtagtap_init(void)
 
 void jtagtap_reset(void)
 {
-#ifdef TRST_PORT
+#ifdef PIN_TRST
 	volatile int i;
-	gpio_clear(TRST_PORT, TRST_PIN);
-	for(i = 0; i < 10000; i++) asm("nop");
-	gpio_set(TRST_PORT, TRST_PIN);
+	io_low(PIN_TRST);
+	for (i = 0; i < 10000; i++)
+		asm("nop");
+	io_high(PIN_TRST);
 #endif
 	jtagtap_soft_reset();
 }
@@ -53,8 +55,8 @@ void jtagtap_reset(void)
 void jtagtap_srst(bool assert)
 {
 	(void)assert;
-#ifdef SRST_SET_VAL
-	SRST_SET_VAL(assert);
+#ifdef PIN_SRST
+	io_set(PIN_SRST, assert);
 	if(assert) {
 		int i;
 		for(i = 0; i < 10000; i++)
@@ -65,17 +67,17 @@ void jtagtap_srst(bool assert)
 
 inline uint8_t jtagtap_next(uint8_t dTMS, uint8_t dTDO)
 {
-	uint16_t ret;
+	bool ret;
 
-	gpio_set_val(TMS_PORT, TMS_PIN, dTMS);
-	gpio_set_val(TDI_PORT, TDI_PIN, dTDO);
-	gpio_set(TCK_PORT, TCK_PIN);
-	ret = gpio_get(TDO_PORT, TDO_PIN);
-	gpio_clear(TCK_PORT, TCK_PIN);
+	io_set(PIN_TMS, dTMS);
+	io_set(PIN_TDI, dTDO);
+	io_high(PIN_TCK);
+	ret = io_is_set(PIN_TDO);
+	io_low(PIN_TCK);
 
 	DEBUG("jtagtap_next(TMS = %d, TDO = %d) = %d\n", dTMS, dTDO, ret);
 
-	return ret != 0;
+	return ret;
 }
 
 

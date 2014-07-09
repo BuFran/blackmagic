@@ -54,7 +54,7 @@ void usbuart_init(void)
 
 	rcc_periph_clock_enable(USBUSART_CLK);
 
-	UART_PIN_SETUP();
+	io_af_out(USBUSART_PIN_TX);
 
 	/* Setup UART parameters. */
 	usart_set_baudrate(USBUSART, 38400);
@@ -73,7 +73,7 @@ void usbuart_init(void)
 	nvic_enable_irq(USBUSART_IRQ);
 
 	/* Setup timer for running deferred FIFO processing */
-	USBUSART_TIM_CLK_EN();
+	rcc_periph_clock_enable(USBUSART_TIM_CLK);
 	timer_reset(USBUSART_TIM);
 	timer_set_mode(USBUSART_TIM, TIM_CR1_CKD_CK_INT,
 			TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
@@ -107,7 +107,7 @@ static void usbuart_run(void)
 	if (buf_rx_in == buf_rx_out) {
 		/* turn off LED, disable IRQ */
 		timer_disable_irq(USBUSART_TIM, TIM_DIER_UIE);
-		gpio_clear(LED_PORT_UART, LED_UART);
+		io_low(PIN_LED_UART);
 	}
 	else
 	{
@@ -179,10 +179,10 @@ void usbuart_usb_out_cb(usbd_device *dev, uint8_t ep)
 		return;
 #endif
 
-	gpio_set(LED_PORT_UART, LED_UART);
+	io_high(PIN_LED_UART);
 	for(int i = 0; i < len; i++)
 		usart_send_blocking(USBUSART, buf[i]);
-	gpio_clear(LED_PORT_UART, LED_UART);
+	io_low(PIN_LED_UART);
 }
 
 
@@ -202,7 +202,7 @@ void USBUSART_ISR(void)
 	char c = usart_recv(USBUSART);
 
 	/* Turn on LED */
-	gpio_set(LED_PORT_UART, LED_UART);
+	io_high(PIN_LED_UART);
 
 	/* If the next increment of rx_in would put it at the same point
 	* as rx_out, the FIFO is considered full.

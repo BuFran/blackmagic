@@ -44,7 +44,7 @@
 
 void traceswo_init(void)
 {
-	TRACE_TIM_CLK_EN();
+	rcc_periph_clock_enable(TRACE_TIM_CLK);
 
 	timer_reset(TRACE_TIM);
 

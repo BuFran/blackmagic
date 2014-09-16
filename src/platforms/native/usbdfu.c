@@ -22,6 +22,7 @@
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/cm3/scb.h>
+#include "io.h"
 
 #include "usbdfu.h"
 
@@ -37,38 +38,40 @@ int main(void)
 {
 	/* Check the force bootloader pin*/
 	rcc_periph_clock_enable(RCC_GPIOB);
-	if(gpio_get(GPIOB, GPIO12))
+	if(io_is_set(PB12))
 		dfu_jump_app_if_valid();
 
 	dfu_protect(DFU_MODE);
 
+#if defined(FCLK_16MHZ)
+	rcc_clock_setup_in_hse_16mhz_out_72mhz();
+#else
 	rcc_clock_setup_in_hse_8mhz_out_72mhz();
+#endif
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB_DIV8);
 	systick_set_reload(900000);
 
 	rcc_periph_clock_enable(RCC_GPIOA);
 	rcc_periph_clock_enable(RCC_USB);
-	gpio_set_mode(GPIOA, GPIO_MODE_INPUT, 0, GPIO8);
+	io_input(PA8);
 
 	systick_interrupt_enable();
 	systick_counter_enable();
 
-	gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_2_MHZ,
-			GPIO_CNF_OUTPUT_PUSHPULL, GPIO11);
-	gpio_set_mode(GPIOB, GPIO_MODE_INPUT,
-			GPIO_CNF_INPUT_FLOAT, GPIO2 | GPIO10);
+	io_output(PB11);
+	io_input(PB2);
+	io_input(PB10);
 
 	dfu_init(&stm32f103_usb_driver, DFU_MODE);
 
-	gpio_set(GPIOA, GPIO8);
-	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_2_MHZ,
-			GPIO_CNF_OUTPUT_PUSHPULL, GPIO8);
+	io_high(PA8);
+	io_output(PA8);
 
 	dfu_main();
 }
 
 void sys_tick_handler(void)
 {
-	gpio_toggle(GPIOB, GPIO11); /* LED2 on/off */
+	io_toggle(PB11); /* LED2 on/off */
 }
 

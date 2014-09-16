@@ -164,5 +164,7 @@ void uart_usb_buf_drain(uint8_t ep);
 
 void disconnect_usb(void);
 void assert_boot_pin(void);
+void setup_vbus_irq(void);
+void platform_srst_set_val(bool assert);
 
 #endif

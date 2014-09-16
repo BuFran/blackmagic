@@ -56,7 +56,7 @@ void jtagtap_srst(bool assert)
 {
 	(void)assert;
 #ifdef PIN_SRST
-	io_set(PIN_SRST, assert);
+	platform_srst_set_val(assert);
 	if(assert) {
 		int i;
 		for(i = 0; i < 10000; i++)

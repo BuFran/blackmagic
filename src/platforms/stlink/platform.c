@@ -118,6 +118,11 @@ int platform_init(void)
 	return 0;
 }
 
+void platform_srst_set_val(bool assert)
+{
+	io_set(PIN_SRST, assert);
+}
+
 void platform_delay(uint32_t delay)
 {
 	timeout_counter = delay;

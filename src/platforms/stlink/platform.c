@@ -65,7 +65,7 @@ int platform_hwversion(void)
 
 void platform_init(void)
 {
-	rcc_clock_setup_in_hse_8mhz_out_72mhz();
+	rcc_clock_setup_in_hse_16mhz_out_72mhz();
 
 	/* Enable peripherals */
 	rcc_periph_clock_enable(RCC_USB);

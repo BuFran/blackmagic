@@ -102,7 +102,7 @@ int main(void)
 
 	dfu_protect(DFU_MODE);
 
-	rcc_clock_setup_in_hse_8mhz_out_72mhz();
+	rcc_clock_setup_in_hse_16mhz_out_72mhz();
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB_DIV8);
 	systick_set_reload(900000);
 
